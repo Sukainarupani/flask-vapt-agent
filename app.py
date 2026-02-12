@@ -22,10 +22,15 @@ MAX_WAIT = 180
 # ==============================
 # HEALTH CHECK (RENDER NEEDS THIS)
 # ==============================
-@app.route("/")
-def health():
-    return {"status": "Flask VAPT Agent is running"}
+@app.route("/submit", methods=["POST"])
+def submit_from_n8n():
+    data = request.json
+    print("Received from n8n:", data)
 
+    return jsonify({
+        "status": "success",
+        "received": data
+    })
 # ==============================
 # HELPERS
 # ==============================
@@ -265,4 +270,5 @@ def scan_download():
 # ENTRY POINT
 # ==============================
 if __name__ == "__main__":
+
     app.run(host="0.0.0.0", port=5000)
