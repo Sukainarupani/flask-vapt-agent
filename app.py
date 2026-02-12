@@ -13,7 +13,7 @@ CLI_PASSWORD = os.getenv("ZAP_PASSWORD")
 LOGIN_URL = os.getenv("LOGIN_URL")
 
 
------------------------
+# -----------------------
 @app.route("/zap-status", methods=["GET"])
 def zap_status():
     try:
@@ -282,4 +282,5 @@ def scan_download():
 if __name__ == "__main__":
 
     app.run(host="0.0.0.0", port=5000)
+
 
