@@ -12,7 +12,12 @@ CLI_USERNAME = os.getenv("ZAP_USERNAME")
 CLI_PASSWORD = os.getenv("ZAP_PASSWORD")
 LOGIN_URL = os.getenv("LOGIN_URL")
 
-
+# ==============================
+# FLASK
+# ==============================
+app = Flask(__name__)
+ZAP_API =  os.getenv("ZAP_API")
+MAX_WAIT = 180
 # -----------------------
 @app.route("/zap-status", methods=["GET"])
 def zap_status():
@@ -21,14 +26,6 @@ def zap_status():
         return r.json()
     except Exception as e:
         return {"error": str(e)}, 500
-
-# ==============================
-# FLASK
-# ==============================
-app = Flask(__name__)
-ZAP_API =  os.getenv("ZAP_API")
-MAX_WAIT = 180
-
 # ==============================
 # HEALTH CHECK (RENDER NEEDS THIS)
 # ==============================
@@ -282,5 +279,6 @@ def scan_download():
 if __name__ == "__main__":
 
     app.run(host="0.0.0.0", port=5000)
+
 
 
