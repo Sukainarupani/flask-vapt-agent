@@ -16,28 +16,16 @@ LOGIN_URL = os.getenv("LOGIN_URL")
 # FLASK
 # ==============================
 app = Flask(__name__)
-ZAP_API =  os.getenv("ZAP_API")
+ZAP_API = "http://127.0.0.1:8090"
 MAX_WAIT = 180
-# -----------------------
-@app.route("/zap-status", methods=["GET"])
-def zap_status():
-    try:
-        r = requests.get(f"{ZAP_API}/JSON/core/view/version/")
-        return r.json()
-    except Exception as e:
-        return {"error": str(e)}, 500
+
 # ==============================
 # HEALTH CHECK (RENDER NEEDS THIS)
 # ==============================
-@app.route("/submit", methods=["POST"])
-def submit_from_n8n():
-    data = request.json
-    print("Received from n8n:", data)
+@app.route("/")
+def health():
+    return {"status": "Flask VAPT Agent is running"}
 
-    return jsonify({
-        "status": "success",
-        "received": data
-    })
 # ==============================
 # HELPERS
 # ==============================
@@ -57,9 +45,13 @@ def zap_request(endpoint, params=None):
 # ==============================
 # AUTH SETUP
 # ==============================
-def zap_setup_auth(target_url):
-    if not CLI_USERNAME or not CLI_PASSWORD or not LOGIN_URL:
-        print("[!] Auth skipped (missing environment variables)")
+def zap_setup_auth(target_url, username, password, login_url):
+    if not username or not password or not login_url:
+        missing = []
+        if not username: missing.append("username")
+        if not password: missing.append("password")
+        if not login_url: missing.append("login_url")
+        print(f"[!] Auth skipped. Missing: {', '.join(missing)}")
         return False
 
     print("[*] Setting up ZAP authentication...")
@@ -74,6 +66,7 @@ def zap_setup_auth(target_url):
         return False
 
     context_id = ctx_resp["contextId"]
+    print(f"[+] Context created: {context_name} (ID={context_id})")
 
     zap_request("/JSON/context/action/includeInContext/", {
         "contextName": context_name,
@@ -81,9 +74,9 @@ def zap_setup_auth(target_url):
     })
 
     auth_config = (
-        f"loginUrl={LOGIN_URL}&"
-        f"loginRequestData=username={CLI_USERNAME}&password={CLI_PASSWORD}"
-    )
+        f"loginUrl={login_url}&"
+        f"loginRequestData=username={username}&password={password}"
+)
 
     zap_request("/JSON/authentication/action/setAuthenticationMethod/", {
         "contextId": context_id,
@@ -100,11 +93,12 @@ def zap_setup_auth(target_url):
         return False
 
     user_id = user_resp["userId"]
+    print(f"[+] User created (ID={user_id})")
 
     zap_request("/JSON/users/action/setAuthenticationCredentials/", {
         "contextId": context_id,
         "userId": user_id,
-        "authCredentialsConfigParams": f"username={CLI_USERNAME}&password={CLI_PASSWORD}"
+        "authCredentialsConfigParams": f"username={username}&password={password}"
     })
 
     zap_request("/JSON/users/action/setUserEnabled/", {
@@ -122,7 +116,8 @@ def zap_setup_auth(target_url):
         "boolean": "true"
     })
 
-    print("[+] Authentication setup complete")
+    print("[+] Forced user mode enabled")
+    print("[+] ZAP authentication setup complete")
     return True
 
 # ==============================
@@ -242,7 +237,13 @@ def create_word_report(data, filename="VAPT_Report.docx"):
 @app.route("/scan-download", methods=["POST"])
 def scan_download():
     data = request.json
+    print(f"[DEBUG] Received payload: {data}")
+
     url = data.get("url")
+    username = data.get("username")
+    password = data.get("password")
+    # Default login_url to the target url if not provided
+    login_url = data.get("login_url") or url
 
     if not url:
         return jsonify({"error": "URL missing"}), 400
@@ -252,7 +253,7 @@ def scan_download():
     zap_clear()
 
     scan_type = "Unauthenticated"
-    if zap_setup_auth(url):
+    if zap_setup_auth(url, username, password, login_url):
         scan_type = "Authenticated"
 
     zap_spider(url)
@@ -277,8 +278,4 @@ def scan_download():
 # ENTRY POINT
 # ==============================
 if __name__ == "__main__":
-
     app.run(host="0.0.0.0", port=5000)
-
-
-
