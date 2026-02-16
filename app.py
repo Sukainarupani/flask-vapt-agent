@@ -6,17 +6,10 @@ from collections import defaultdict
 import os
 
 # ==============================
-# ENVIRONMENT VARIABLES (CLOUD SAFE)
-# ==============================
-CLI_USERNAME = os.getenv("ZAP_USERNAME")
-CLI_PASSWORD = os.getenv("ZAP_PASSWORD")
-LOGIN_URL = os.getenv("LOGIN_URL")
-
-# ==============================
 # FLASK
 # ==============================
 app = Flask(__name__)
-ZAP_API = "http://127.0.0.1:8090"
+ZAP_API = os.getenv("ZAP_API")
 MAX_WAIT = 180
 
 # ==============================
@@ -36,10 +29,16 @@ def ensure_protocol(url):
 
 def zap_request(endpoint, params=None):
     try:
-        r = requests.get(f"{ZAP_API}{endpoint}", params=params, timeout=10)
+        r = requests.get(
+            f"{ZAP_API}{endpoint}",
+            params=params,
+            timeout=20,
+            verify=False
+        )
+        r.raise_for_status()
         return r.json()
-    except:
-        print("[!] ZAP request failed:", endpoint)
+    except Exception as e:
+        print("[!] ZAP request failed:", endpoint, e)
         return None
 
 # ==============================
@@ -239,10 +238,17 @@ def scan_download():
     data = request.json
     print(f"[DEBUG] Received payload: {data}")
 
+    # ---- ZAP sanity checks (ADD THIS) ----
+    if not ZAP_API:
+        return jsonify({"error": "ZAP_API not configured"}), 500
+
+    if not zap_request("/JSON/core/view/version/"):
+        return jsonify({"error": "ZAP not reachable"}), 500
+    # -------------------------------------
+
     url = data.get("url")
     username = data.get("username")
     password = data.get("password")
-    # Default login_url to the target url if not provided
     login_url = data.get("login_url") or url
 
     if not url:
@@ -279,3 +285,4 @@ def scan_download():
 # ==============================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
